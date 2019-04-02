@@ -118,14 +118,14 @@ public class HdfsSinkTask extends SinkTask {
     
     Collection<SinkRecord> validRecords = new ArrayList<SinkRecord>();
     for (SinkRecord record : records) {
-    	String dataStr =  record.value().toString();
-        log.debug("write info***" + dataStr + "***");  
-        if(dataStr.indexOf("cas_wrong_record") < 0) {
-        	validRecords.add(record);
-        } else {
-        	logInvalidRecords(record);
-        }
-	}    
+      String dataStr = record.value().toString();
+      log.debug("write info***" + dataStr + "***");
+      if (dataStr.indexOf("cas_wrong_record") < 0) {
+        validRecords.add(record);
+      } else {
+        logInvalidRecords(record);
+      }
+    }
     
     try {
       hdfsWriter.write(validRecords);
@@ -134,45 +134,31 @@ public class HdfsSinkTask extends SinkTask {
     }
   }
   
-  private void logInvalidRecords(SinkRecord record){
-	  
-	  
-	  //String url = connectorConfig.getString(HdfsSinkConnectorConfig.HDFS_URL_CONFIG);
-      //String topic = connectorConfig.getString(StorageCommonConfig.TOPICS_DIR_DEFAULT);
-      
-      String logPath = "/logs/" + record.topic() + "/pos_"+ record.kafkaPartition() + "_" + record.kafkaOffset() + ".txt";
-     
-      /**
-      @SuppressWarnings("unchecked")
-      Class<? extends HdfsStorage> storageClass = (Class<? extends HdfsStorage>) connectorConfig
-          .getClass(StorageCommonConfig.STORAGE_CLASS_CONFIG);
-      HdfsStorage storage = io.confluent.connect.storage.StorageFactory.createStorage(
-          storageClass,
-          HdfsSinkConnectorConfig.class,
-          connectorConfig,
-          url
-      );*/
-      
-      HdfsStorage storage = (HdfsStorage)hdfsWriter.getStorage();
-      
-      OutputStream os = storage.create(logPath, true);
-      
-      try {
+  private void logInvalidRecords(SinkRecord record) {
 
-			os.write((record.value().toString()).getBytes("UTF-8"));
-			os.flush();
-			
-			log.info("***logInvalidRecords done({})***", logPath);  
+    String logPath = "/logs/" + record.topic() 
+        + "/pos_" + record.kafkaPartition() + "_" + record.kafkaOffset() + ".txt";
+
+    HdfsStorage storage = (HdfsStorage)hdfsWriter.getStorage();
+    
+    OutputStream os = storage.create(logPath, true);
+
+    try {
+
+      os.write((record.value().toString()).getBytes("UTF-8"));
+      os.flush();
+      
+      log.info("***logInvalidRecords done({})***", logPath);  
+    } catch (Exception e) {
+      e.toString();
+    } finally {
+      try {
+        os.close();
       } catch (Exception e) {
-			e.toString();
-      } finally {
-    	  try {
-    		  os.close();
-    	  }catch(Exception e){
-    		  e.printStackTrace();
-    	  }
+        e.printStackTrace();
       }
-	  
+    }
+    
   }
   @Override
   public Map<TopicPartition, OffsetAndMetadata> preCommit(
