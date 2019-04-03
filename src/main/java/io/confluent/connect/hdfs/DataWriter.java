@@ -31,6 +31,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.io.OutputStream;
 import java.lang.reflect.InvocationTargetException;
 import java.net.InetAddress;
 import java.util.Collection;
@@ -341,6 +342,30 @@ public class DataWriter {
       throw new ConnectException("Reflection exception: ", e);
     } catch (IOException e) {
       throw new ConnectException(e);
+    }
+  }
+  
+  public void writeInvalidRecords(Collection<SinkRecord> records) {
+    for (SinkRecord record : records) {
+      String logPath = "/logs/" + record.topic() + "/" 
+          + record.topic() + "_" + record.kafkaPartition() + "_" + record.kafkaOffset() + ".err";
+
+      HdfsStorage storage = (HdfsStorage)getStorage();
+      OutputStream os = storage.create(logPath, true);
+      try {
+        os.write((record.value().toString()).getBytes("UTF-8"));
+        os.flush();
+          
+        log.info("***logInvalidRecords done({})***", logPath);  
+      } catch (Exception e) {
+        e.toString();
+      } finally {
+        try {
+          os.close();
+        } catch (Exception e) {
+          e.printStackTrace();
+        }
+      }
     }
   }
 

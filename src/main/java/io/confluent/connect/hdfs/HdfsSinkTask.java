@@ -32,12 +32,11 @@ import java.util.Map;
 import java.util.Set;
 
 import io.confluent.connect.avro.AvroData;
-import io.confluent.connect.hdfs.storage.HdfsStorage;
-import io.confluent.connect.storage.common.StorageCommonConfig;
+
 import io.confluent.connect.storage.hive.HiveConfig;
 import io.confluent.connect.storage.partitioner.PartitionerConfig;
 import io.confluent.connect.storage.schema.StorageSchemaCompatibility;
-import java.io.OutputStream;
+
 
 public class HdfsSinkTask extends SinkTask {
 
@@ -117,49 +116,27 @@ public class HdfsSinkTask extends SinkTask {
     }    
     
     Collection<SinkRecord> validRecords = new ArrayList<SinkRecord>();
+    Collection<SinkRecord> invalidRecords = new ArrayList<SinkRecord>();
     for (SinkRecord record : records) {
-      String dataStr = record.value().toString();
-      log.debug("write info***" + dataStr + "***");
-      if (dataStr.indexOf("cas_wrong_record") < 0) {
+      String dataStr = record.value().toString();      
+      if (dataStr.indexOf(HdfsSinkConnectorConfig.KC_WRONG_RECORD_KEY) < 0) {
         validRecords.add(record);
       } else {
-        logInvalidRecords(record);
+        log.debug("invalid record info***" + dataStr + "***");
+        invalidRecords.add(record);
       }
     }
     
     try {
       hdfsWriter.write(validRecords);
+      hdfsWriter.writeInvalidRecords(invalidRecords);
     } catch (ConnectException e) {
       throw new ConnectException(e);
     }
   }
   
-  private void logInvalidRecords(SinkRecord record) {
+  
 
-    String logPath = "/logs/" + record.topic() 
-        + "/pos_" + record.kafkaPartition() + "_" + record.kafkaOffset() + ".txt";
-
-    HdfsStorage storage = (HdfsStorage)hdfsWriter.getStorage();
-    
-    OutputStream os = storage.create(logPath, true);
-
-    try {
-
-      os.write((record.value().toString()).getBytes("UTF-8"));
-      os.flush();
-      
-      log.info("***logInvalidRecords done({})***", logPath);  
-    } catch (Exception e) {
-      e.toString();
-    } finally {
-      try {
-        os.close();
-      } catch (Exception e) {
-        e.printStackTrace();
-      }
-    }
-    
-  }
   @Override
   public Map<TopicPartition, OffsetAndMetadata> preCommit(
       Map<TopicPartition, OffsetAndMetadata> currentOffsets

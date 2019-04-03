@@ -57,6 +57,7 @@ public class HdfsSinkConnectorConfig extends StorageSinkConnectorConfig {
 
   // HDFS Group
   // This config is deprecated and will be removed in future releases. Use store.url instead.
+  public static final String KC_WRONG_RECORD_KEY = "kc_wrong_record";
   public static final String HDFS_URL_CONFIG = "hdfs.url";
   public static final String HDFS_URL_DOC =
       "The HDFS connection URL. This configuration has the format of hdfs://hostname:port and "
