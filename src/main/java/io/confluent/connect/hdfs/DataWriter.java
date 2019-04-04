@@ -31,7 +31,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.io.OutputStream;
+
 import java.lang.reflect.InvocationTargetException;
 import java.net.InetAddress;
 import java.util.Collection;
@@ -48,7 +48,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-
+import java.util.ArrayList;
 import io.confluent.common.utils.SystemTime;
 import io.confluent.common.utils.Time;
 import io.confluent.connect.avro.AvroData;
@@ -345,27 +345,17 @@ public class DataWriter {
     }
   }
   
-  public void writeInvalidRecords(Collection<SinkRecord> records) {
+  
+  public void writeInvalidRecords(ArrayList<SinkRecord> records) {
     for (SinkRecord record : records) {
-      String logPath = "/logs/" + record.topic() + "/" 
-          + record.topic() + "_" + record.kafkaPartition() + "_" + record.kafkaOffset() + ".err";
-
-      HdfsStorage storage = (HdfsStorage)getStorage();
-      OutputStream os = storage.create(logPath, true);
-      try {
-        os.write((record.value().toString()).getBytes("UTF-8"));
-        os.flush();
-          
-        log.info("***logInvalidRecords done({})***", logPath);  
-      } catch (Exception e) {
-        e.toString();
-      } finally {
-        try {
-          os.close();
-        } catch (Exception e) {
-          e.printStackTrace();
-        }
-      }
+      String topic = record.topic();
+      int partition = record.kafkaPartition();
+      TopicPartition tp = new TopicPartition(topic, partition);
+      topicPartitionWriters.get(tp).bufferInvalid(record);
+    }
+    
+    for (TopicPartition tp : assignment) {
+      topicPartitionWriters.get(tp).writeInvalidRecords();
     }
   }
 

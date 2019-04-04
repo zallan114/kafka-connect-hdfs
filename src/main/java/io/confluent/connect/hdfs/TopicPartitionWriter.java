@@ -31,6 +31,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -81,6 +82,7 @@ public class TopicPartitionWriter {
   private final String topicsDir;
   private State state;
   private final Queue<SinkRecord> buffer;
+  private final Queue<SinkRecord> bufferInvalid;
   private boolean recovered;
   private final SinkTaskContext context;
   private int recordCounter;
@@ -202,6 +204,7 @@ public class TopicPartitionWriter {
     wal = storage.wal(logsDir, tp);
 
     buffer = new LinkedList<>();
+    bufferInvalid = new LinkedList<>();
     writers = new HashMap<>();
     tempFiles = new HashMap<>();
     appended = new HashSet<>();
@@ -309,6 +312,56 @@ public class TopicPartitionWriter {
             tp,
             new DateTime(nextScheduledRotate).withZone(timeZone).toString()
         );
+      }
+    }
+  }
+  
+  public void writeInvalidRecords() {
+    int maxErrRecordCnt = 1000;
+    try {
+      maxErrRecordCnt = connectorConfig.getInt(HdfsSinkConnectorConfig.KC_WRONG_RECORD_MAX_CNT);
+    } catch (Exception e) {
+      log.error(
+          "kc_wrong_records_max_cnt should be defined in connector config," 
+              + " now using default 1000: {}", e.toString());
+    }
+    
+    while (!bufferInvalid.isEmpty()) {    
+    
+      SinkRecord firstRecord = bufferInvalid.peek();
+      if (firstRecord != null) {
+        String logPath = "/logs/" + firstRecord.topic() + "/" 
+            + firstRecord.topic() + "_" + firstRecord.kafkaPartition() + "_" 
+            + firstRecord.kafkaOffset() + ".err";
+        
+        OutputStream os = storage.create(logPath, true);
+        try {
+          
+          os.write((firstRecord.value().toString()).getBytes("UTF-8"));
+          bufferInvalid.poll();
+          
+           
+          for (int i = 0; i < maxErrRecordCnt; i++) {
+            SinkRecord record = bufferInvalid.peek();
+            if (record != null) {
+              os.write((record.value().toString()).getBytes("UTF-8"));
+              bufferInvalid.poll();
+            } else {
+              break;
+            }
+          }
+          os.flush();
+  
+          log.info("***logInvalidRecords done({})", logPath);
+        } catch (Exception e) {
+          e.toString();
+        } finally {
+          try {
+            os.close();
+          } catch (Exception e) {
+            e.printStackTrace();
+          }
+        }
       }
     }
   }
@@ -483,6 +536,9 @@ public class TopicPartitionWriter {
     buffer.add(sinkRecord);
   }
 
+  public void bufferInvalid(SinkRecord sinkRecord) {
+    bufferInvalid.add(sinkRecord);
+  }
   /**
    * Get the offset that was last committed to HDFS, or null if nothing was committed yet.
    *

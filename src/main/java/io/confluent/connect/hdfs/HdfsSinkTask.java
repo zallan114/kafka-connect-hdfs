@@ -116,7 +116,7 @@ public class HdfsSinkTask extends SinkTask {
     }    
     
     Collection<SinkRecord> validRecords = new ArrayList<SinkRecord>();
-    Collection<SinkRecord> invalidRecords = new ArrayList<SinkRecord>();
+    ArrayList<SinkRecord> invalidRecords = new ArrayList<SinkRecord>();
     for (SinkRecord record : records) {
       String dataStr = record.value().toString();      
       if (dataStr.indexOf(HdfsSinkConnectorConfig.KC_WRONG_RECORD_KEY) < 0) {
